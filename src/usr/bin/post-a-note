@@ -1,0 +1,122 @@
+#! /bin/bash
+#
+# Simple notes
+# Author: w00fpack 2021
+
+# can use customn jwmrc-personal Group to get rid of min/max/close
+# TODO:  rename to notelist
+#
+
+#
+# ---------------------------------------------------------------
+TEXTEDITOR=defaulttexteditor
+SAVEPATH=${XDG_CACHE_HOME:-$HOME/.cache}
+GTKRC_FILE="$SAVEPATH/post-a-note.gtkrc"
+#pid=${$}
+#
+# ---------------------------------------------------------------
+
+export GTKRC_FILE SAVEPATH
+
+
+function note_toggle () {
+	popup_running=`ps -eo pid,cmd |  grep "^.[0-9]* yad --name=postanote"`
+
+	if [ "$popup_running" != "" ] ; then
+		# TODO: automatically save on closing note probby via listen
+		popup_pid=`echo "$popup_running" | cut -d\  -f1`
+		if [ ! -z $popup_pid ] ; then
+			kill -9 $popup_pid
+			exit
+		fi
+	fi
+
+	# Note:   --back="#F5FFB3" used because GtkTextView not processed form gtkrc above
+	# --button="gtk-save:0" --button="gtk-cancel:1"
+
+	[[ -e $SAVEPATH/post-a-note.lock ]] && return
+	touch $SAVEPATH/post-a-note.lock
+	yad --name="postanote" --show-uri --geometry=400x200-10-50 \
+		--skip-taskbar \
+		--window-icon="/usr/share/pixmaps/post-a-note.png" \
+		--gtkrc=$GTKRC_FILE \
+		--title=$"Post a Note  (hit ESC to save changes)" \
+		--escape-ok \
+		--text-info --editable --back="#F5FFB3" \
+		--fontname="Comic Neue regular normal 12" \
+		--show-uri --uri-color="blue" \
+		--filename=$SAVEPATH/post-a-note > $SAVEPATH/post-a-note_tmp \
+		--no-buttons \
+		--button="gtk-close:0"
+		#--undecorated \
+		#--image="/usr/share/pixmaps/post-a-note.png" \
+		#--image-on-top \
+
+	# TODO: automatically save on closing note, without having to click save
+
+	[[ $? -eq 0 ]] && mv $SAVEPATH/post-a-note_tmp $SAVEPATH/post-a-note
+	rm -f $SAVEPATH/post-a-note.lock
+}
+export -f note_toggle
+
+function show_about() {
+	 yad --center --geometry=400x200 --name="notes_about" --window-icon="/usr/share/pixmaps/post-a-note.png" \
+		--gtkrc=$GTKRC_FILE \
+		--image="/usr/share/pixmaps/post-a-note.png" \
+        --title=$"About Post a Note" \
+        --text=$"<span font_desc='Sans Bold Italic 13' foreground='#0000ff'>Take a temporary note</span> \n\nScribble down something, and then press Escape to save.\n\n<b>Left-click</b> to show note popup.\n<b>Right-click</b> to show menu.\n\nhttps://github.com/w00fpack/post-a-note/" \
+		--button="gtk-close:0"
+}
+export -f show_about
+
+if [ `ps -eo cmd | grep "^yad --name=traypostanote " | wc -l` -gt 0 ]; then
+	note_toggle
+	exit
+	#yad --center --title=$"Post a Note" \
+		#--window-icon="/usr/share/pixmaps/post-a-note.png" \
+		#--text "Post-a-note already running.  Access via system tray icon" \
+		#--button="gtk-cancel:0"
+	#exit 2
+fi
+
+mkdir -p $SAVEPATH
+
+if [ `ps -eo cmd | grep "^yad --name=postanote " | wc -l` -eq 0 ]; then
+	if [ -f $SAVEPATH/post-a-note.lock ] ; then
+		rm $SAVEPATH/post-a-note.lock
+	fi
+fi
+
+#rm $GTKRC_FILE
+if [ ! -f $GTKRC_FILE ] ; then
+	cat > $GTKRC_FILE <<EOF
+style "defaultstyle" {
+  bg[NORMAL] = "#F5FFB3"
+	xthickness = 0
+	ythickness = 0
+}
+
+class "GtkWidget" style "defaultstyle"
+class "GtkFrame" style "defaultstyle"
+class "GtkTextView" style "defaultstyle"
+EOF
+fi
+
+#function on_exit {
+# ------------------
+     #Removes temorary files
+    #rm -f $SAVEPATH/post-a-note.lock
+#}
+#trap "on_exit" EXIT
+#trap "on_exit" QUIT
+#trap "on_exit" KILL
+
+exec yad --name="traypostanote" --notification \
+	--image="/usr/share/pixmaps/post-a-note.png" \
+	--text=$"Post a Note" \
+	--no-middle \
+	--command "sh -c note_toggle" \
+	--item-separator=~ \
+	--menu="About~sh -c show_about \
+		|Change Colors~$TEXTEDITOR $GTKRC_FILE \
+		|Quit~quit"

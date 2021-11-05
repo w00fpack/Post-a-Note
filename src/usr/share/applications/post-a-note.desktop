@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Post a Note
+Comment=Post a Note
+Icon=/usr/share/pixmaps/post-a-note.png
+Exec=post-a-note
+Terminal=false
+Type=Application
+Categories=X-Document-utility;
